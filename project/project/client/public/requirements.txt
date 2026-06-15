@@ -1,0 +1,28 @@
+# Social Media AI Automation - Python Dependencies
+# ================================================
+# Instale com: pip install -r requirements.txt
+
+# Core
+python-dotenv>=1.0.0
+
+# YouTube & Audio
+yt-dlp>=2023.12.30
+faster-whisper>=0.10.0
+
+# AI & LLM
+groq>=0.4.0
+
+# Data Processing
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Database
+sqlite3  # Built-in, no installation needed
+
+# Utilities
+requests>=2.31.0
+python-dateutil>=2.8.2
+
+# Optional: For advanced features
+# plotly>=5.17.0  # For data visualization
+# pydub>=0.25.1   # For audio processing (requires ffmpeg)

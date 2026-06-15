@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  # Aplicação principal
+  app:
+    build: .
+    container_name: social-media-ai-app
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://user:password@db:3306/social_media_ai
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Banco de dados MySQL
+  db:
+    image: mysql:8.0-alpine
+    container_name: social-media-ai-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=social_media_ai
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis para filas e cache
+  redis:
+    image: redis:7-alpine
+    container_name: social-media-ai-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
+  # Python Sandbox (isolado) para execução segura de scripts
+  python-sandbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.sandbox
+    container_name: social-media-ai-python-sandbox
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./output:/output
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - app-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Worker para processar jobs da fila
+  worker:
+    build: .
+    container_name: social-media-ai-worker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=mysql://user:password@db:3306/social_media_ai
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORKER_MODE=true
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app-network
+    restart: unless-stopped
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  db-data:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

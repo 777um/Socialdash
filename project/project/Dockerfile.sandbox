@@ -1,0 +1,38 @@
+# Dockerfile para sandbox isolado de execução de Python
+# Resolve problema P0: Execução Python via spawn() sem isolamento
+
+FROM python:3.11-slim
+
+# Desabilitar pip cache e bytecode
+ENV PIP_NO_CACHE_DIR=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Criar usuário não-root para segurança
+RUN useradd -m -u 1000 sandbox && \
+    mkdir -p /app /scripts /output && \
+    chown -R sandbox:sandbox /app /scripts /output
+
+# Instalar dependências mínimas
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY --chown=sandbox:sandbox requirements-sandbox.txt /app/
+
+# Instalar dependências Python
+RUN pip install --no-cache-dir -r /app/requirements-sandbox.txt
+
+# Trocar para usuário não-root
+USER sandbox
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Timeout de 30 segundos para evitar scripts infinitos
+ENV TIMEOUT=30
+
+# Entrypoint: executar script com timeout
+ENTRYPOINT ["timeout", "30", "python"]
